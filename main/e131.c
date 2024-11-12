@@ -48,7 +48,7 @@ void e131task(void *pvParameters) {
 	}
 
 	ip_addr_t multiaddr;
-	IP_ADDR4(&multiaddr, 239, 255, 0, 1); //IPv4 local scope multicast
+	IP_ADDR4(&multiaddr, 239, 255, 0, CONFIG_SACN_UNIVERSE); //IPv4 local scope multicast - listen to only needed universe
 
 	err = netconn_join_leave_group(conn, &multiaddr, &netif_default->ip_addr, NETCONN_JOIN);
 	if(err != ERR_OK) {
@@ -73,11 +73,20 @@ void e131task(void *pvParameters) {
 			memcpy(e131packettemporary.raw, buf->p->payload, buf->p->tot_len);
 			e131packettemporary.universe = reverse(e131packettemporary.universe);
 			if (e131packettemporary.universe == CONFIG_SACN_UNIVERSE) {
-				memcpy(e131packet.raw, e131packettemporary.raw, sizeof(e131packet.raw));
-				e131packet_received = xTaskGetTickCount() * portTICK_PERIOD_MS;
-				// ESP_LOGI(TAG, "Universe %d channel 1 %d", e131packet.universe, e131packet.property_values[1]);
+				if (e131packettemporary.property_values[0] == 0) {
+					memcpy(e131packet.raw, e131packettemporary.raw, sizeof(e131packet.raw));
+					e131packet_received = xTaskGetTickCount() * portTICK_PERIOD_MS;
+					//ESP_LOGI(TAG, "Universe %d | Data [ %d , %d , %d , %d , %d ]", 
+					//	e131packet.universe, 
+					//	e131packet.property_values[1], 
+					//	e131packet.property_values[2], 
+					//	e131packet.property_values[3], 
+					//	e131packet.property_values[4], 
+					//	e131packet.property_values[5]);
+				}
+				// else: Non-DMX packet.
 			} else {
-				// ESP_LOGI(TAG, "Incorect Universe %d", e131packettemporary.universe);
+				ESP_LOGI(TAG, "Incorect Universe %d", e131packettemporary.universe);
 			}
 		} else {
 			ESP_LOGE(TAG, "Wrong packet size.\n\n");

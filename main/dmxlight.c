@@ -12,29 +12,35 @@
 #include <stdint.h>
 
 #include "e131.h"
-#include "hsl.h"
 
 /* Channel PWM parameters */
-#define LEDC_MODE               LEDC_HIGH_SPEED_MODE
+#define LEDC_MODE               LEDC_LOW_SPEED_MODE //HIGH SPEED not available?
 #define LEDC_DUTY_RES           LEDC_TIMER_13_BIT // Set duty resolution to 13 bits
 #define LEDC_FREQUENCY          (5000) // Frequency in Hertz.
 #define LEDC_TIMER          	LEDC_TIMER_0
 
 /* Red channel */
-#define LEDC_OUTPUT_IO_RED      (26) // Define the output GPIO
+#define LEDC_OUTPUT_IO_RED      (20) // Define the output GPIO
 #define LEDC_CHANNEL_RED        LEDC_CHANNEL_0
+#define LEDC_INVERT_RED         true
 
 /* Green channel */
-#define LEDC_OUTPUT_IO_GREEN      (27) // Define the output GPIO
+#define LEDC_OUTPUT_IO_GREEN      (18) // Define the output GPIO
 #define LEDC_CHANNEL_GREEN        LEDC_CHANNEL_1
+#define LEDC_INVERT_GREEN         true
 
 /* Blue channel */
-#define LEDC_OUTPUT_IO_BLUE      (13) // Define the output GPIO
+#define LEDC_OUTPUT_IO_BLUE      (21) // Define the output GPIO
 #define LEDC_CHANNEL_BLUE        LEDC_CHANNEL_2
+#define LEDC_INVERT_BLUE         true
 
 /* White channel */
-#define LEDC_OUTPUT_IO_WHITE      (15) // Define the output GPIO
+#define LEDC_OUTPUT_IO_WHITE      (2) // Define the output GPIO
 #define LEDC_CHANNEL_WHITE        LEDC_CHANNEL_3
+#define LEDC_INVERT_WHITE         true
+
+#define DMX_8Bit_VAL(offset)      (e131packet.property_values[CONFIG_SACN_DMX_START + (offset)])
+#define DMX_16Bit_Val(offset)     (DMX_8Bit_VAL(offset) * 256 + DMX_8Bit_VAL(offset+1))
 
 static const char *TAG = "DMX Light";
 dmxlight_config_t dmxlight_config;
@@ -96,35 +102,16 @@ void dmxlighttask(void *pvParameters) {
 	float dmx_green = 0;
 	float dmx_blue = 0;
 	float dmx_white = 0;
-	uint duty_max = 8191;  // 13 bit timer (2**13) - 1
+	uint32_t duty_max = 8191;  // 13 bit timer (2**13) - 1
 	uint32_t duty_red = 0;
 	uint32_t duty_green = 0;
 	uint32_t duty_blue = 0;
 	uint32_t duty_white = 0;
-	float buf_pot = 0;
-	float pot_hue = 0;
-	float pot_lightness = 0;
 	while(1) {
 		if (e131packet_received == 0) {
-			// ESP_LOGI(TAG, "DMX not received yet");
-			if (xQueueReceive(dmxlight_config.queue_ui_pot1, &buf_pot, (TickType_t) 10)) {
-				// ESP_LOGI(TAG, "From queue %f", buf_pot);
-				pot_hue = buf_pot;
-			} else {
-				// ESP_LOGI(TAG, "Error receiving from queue_ui_pot1");
-			}
-			if (xQueueReceive(dmxlight_config.queue_ui_pot2, &buf_pot, (TickType_t) 10)) {
-				// ESP_LOGI(TAG, "From queue %f", buf_pot);
-				pot_lightness = buf_pot;
-			} else {
-				// ESP_LOGI(TAG, "Error receiving from queue_ui_pot2");
-			}
-			// Set color based on pots
-			float RGB[3] = {0, 0, 0};
-			hslToRgb(pot_hue, 1.0f, pot_lightness, RGB);
-			duty_red = (uint32_t)(((float)duty_max) * RGB[0]);
-			duty_green = (uint32_t)(((float)duty_max) * RGB[1]);
-			duty_blue = (uint32_t)(((float)duty_max) * RGB[2]);
+			duty_red = 0;
+			duty_green = 0;
+			duty_blue = 0;
 			duty_white = 0;
 		} else {
 			/* Read DMX values for start-channel */
@@ -140,7 +127,17 @@ void dmxlighttask(void *pvParameters) {
 			duty_green = (uint32_t)(((float)duty_max) * dmx_dimmer * dmx_green);
 			duty_blue = (uint32_t)(((float)duty_max) * dmx_dimmer * dmx_blue);
 			duty_white = (uint32_t)(((float)duty_max) * dmx_dimmer * dmx_white);
-			// ESP_LOGI(TAG, "R %u G %u B %u W %u", duty_red, duty_green, duty_blue, duty_white);
+
+			if (LEDC_INVERT_RED)
+				duty_red = duty_max - duty_red;
+			if (LEDC_INVERT_GREEN)
+				duty_green = duty_max - duty_green;
+			if (LEDC_INVERT_BLUE)
+				duty_blue = duty_max - duty_blue;
+			if (LEDC_INVERT_WHITE)
+				duty_white = duty_max - duty_white;
+
+			ESP_LOGI(TAG, "\033[0;31m R %lu \033[0;32m G %lu \033[0;34m B %lu \033[0;30m W %lu", duty_red, duty_green, duty_blue, duty_white);
 		}
 
 		/* Set duty cycle to RGBW values */
