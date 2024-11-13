@@ -13,6 +13,7 @@ http://tim.gremalm.se
 #include "esp_event.h"
 #include "esp_log.h"
 #include "nvs_flash.h"
+#include "driver/gpio.h"
 
 #include "lwip/err.h"
 #include "lwip/sys.h"
@@ -20,10 +21,12 @@ http://tim.gremalm.se
 #include "e131.h"
 #include "dmxlight.h"
 
-// The examples use WiFi configuration that you can set via project configuration menu.
-#define EXAMPLE_ESP_WIFI_SSID		CONFIG_ESP_WIFI_SSID
-#define EXAMPLE_ESP_WIFI_PASS		CONFIG_ESP_WIFI_PASSWORD
-#define EXAMPLE_ESP_MAXIMUM_RETRY	CONFIG_ESP_MAXIMUM_RETRY
+// XIAO ESP32C6 Antenna MUX IO
+#define ANT_MUX_PWR_PIN     3   // IO 3
+#define ANT_MUX_SEL_PIN     14  // IO 14
+#define ANT_MUX_PWR_BIT     BIT(ANT_MUX_PWR_PIN)
+#define ANT_MUX_SEL_BIT     BIT(ANT_MUX_SEL_PIN)
+
 
 // FreeRTOS event group to signal when we are connected
 static EventGroupHandle_t s_wifi_event_group;
@@ -85,8 +88,8 @@ void wifi_init_sta(void) {
 
 	wifi_config_t wifi_config = {
 		.sta = {
-			.ssid = EXAMPLE_ESP_WIFI_SSID,
-			.password = EXAMPLE_ESP_WIFI_PASS,
+			.ssid = CONFIG_ESP_WIFI_SSID,
+			.password = CONFIG_ESP_WIFI_PASSWORD,
 			.threshold.authmode = WIFI_AUTH_WPA2_PSK,
 			.pmf_cfg = {
 				.capable = true,
@@ -112,10 +115,10 @@ void wifi_init_sta(void) {
 	 * happened. */
 	if (bits & WIFI_CONNECTED_BIT) {
 		ESP_LOGI(TAG, "connected to ap SSID:%s password:%s",
-				 EXAMPLE_ESP_WIFI_SSID, EXAMPLE_ESP_WIFI_PASS);
+				 CONFIG_ESP_WIFI_SSID, CONFIG_ESP_WIFI_PASSWORD);
 	} else if (bits & WIFI_FAIL_BIT) {
 		ESP_LOGI(TAG, "Failed to connect to SSID:%s, password:%s",
-				 EXAMPLE_ESP_WIFI_SSID, EXAMPLE_ESP_WIFI_PASS);
+				 CONFIG_ESP_WIFI_SSID, CONFIG_ESP_WIFI_PASSWORD);
 	} else {
 		ESP_LOGE(TAG, "UNEXPECTED EVENT");
 	}
@@ -133,6 +136,19 @@ void app_main(void) {
 		ret = nvs_flash_init();
 	}
 	ESP_ERROR_CHECK(ret);
+
+	//Enable XIAO ESP32C6 antenna mux
+	gpio_config_t io_conf;
+	io_conf.intr_type = GPIO_INTR_DISABLE;	//disable interrupt
+	io_conf.mode = GPIO_MODE_OUTPUT;	//set as output mode
+	io_conf.pin_bit_mask = ANT_MUX_PWR_BIT | ANT_MUX_SEL_BIT;  //Configure both pins simultaneously
+	io_conf.pull_down_en = 0;	//disable pull-down mode
+	io_conf.pull_up_en = 0;		//disable pull-up mode
+    ESP_ERROR_CHECK(gpio_config(&io_conf));
+
+	ESP_ERROR_CHECK(gpio_set_level(ANT_MUX_PWR_PIN, 0)); //Enable antenna mux
+	ESP_ERROR_CHECK(gpio_set_level(ANT_MUX_SEL_PIN, 0)); //Use internal antenna
+	vTaskDelay(100);
 
 	xTaskCreate(&dmxlighttask, "DMX_Light_task", 4096, &dmxlightconfig, 5, NULL);
 	
