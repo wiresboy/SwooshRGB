@@ -20,27 +20,27 @@
 #define LEDC_TIMER          	LEDC_TIMER_0
 
 /* Red channel */
-#define LEDC_OUTPUT_IO_RED      (20) // Define the output GPIO
+#define LEDC_OUTPUT_IO_RED      (1) // Define the output GPIO 1
 #define LEDC_CHANNEL_RED        LEDC_CHANNEL_0
 #define LEDC_INVERT_RED         true
 
 /* Green channel */
-#define LEDC_OUTPUT_IO_GREEN      (18) // Define the output GPIO
+#define LEDC_OUTPUT_IO_GREEN      (18) // Define the output GPIO 10
 #define LEDC_CHANNEL_GREEN        LEDC_CHANNEL_1
 #define LEDC_INVERT_GREEN         true
 
 /* Blue channel */
-#define LEDC_OUTPUT_IO_BLUE      (21) // Define the output GPIO
+#define LEDC_OUTPUT_IO_BLUE      (20) // Define the output GPIO 9
 #define LEDC_CHANNEL_BLUE        LEDC_CHANNEL_2
 #define LEDC_INVERT_BLUE         true
 
 /* White channel */
-#define LEDC_OUTPUT_IO_WHITE      (2) // Define the output GPIO
+#define LEDC_OUTPUT_IO_WHITE      (16) // Define the output GPIO 6
 #define LEDC_CHANNEL_WHITE        LEDC_CHANNEL_3
 #define LEDC_INVERT_WHITE         true
 
 #define DMX_8Bit_VAL(offset)      (e131packet.property_values[CONFIG_SACN_DMX_START + (offset)])
-#define DMX_16Bit_Val(offset)     (DMX_8Bit_VAL(offset) * 256 + DMX_8Bit_VAL(offset+1))
+#define DMX_16Bit_VAL(offset)     (DMX_8Bit_VAL(offset) * 256 + DMX_8Bit_VAL(offset+1))
 
 static const char *TAG = "DMX Light";
 dmxlight_config_t dmxlight_config;
@@ -115,11 +115,11 @@ void dmxlighttask(void *pvParameters) {
 			duty_white = 0;
 		} else {
 			/* Read DMX values for start-channel */
-			dmx_dimmer = ((float)e131packet.property_values[CONFIG_SACN_DMX_START + 0]) / 255;
-			dmx_red = ((float)e131packet.property_values[CONFIG_SACN_DMX_START + 1]) / 255;
-			dmx_green = ((float)e131packet.property_values[CONFIG_SACN_DMX_START + 2]) / 255;
-			dmx_blue = ((float)e131packet.property_values[CONFIG_SACN_DMX_START + 3]) / 255;
-			dmx_white = ((float)e131packet.property_values[CONFIG_SACN_DMX_START + 4]) / 255;
+			dmx_dimmer = ((float)DMX_16Bit_VAL(0)) / 65535;
+			dmx_red    = ((float)DMX_16Bit_VAL(2)) / 65535;
+			dmx_green  = ((float)DMX_16Bit_VAL(4)) / 65535;
+			dmx_blue   = ((float)DMX_16Bit_VAL(6)) / 65535;
+			dmx_white  = ((float)DMX_16Bit_VAL(8)) / 65535;
 			// ESP_LOGI(TAG, "Dimmer %f R %f G %f B %f W %f", dmx_dimmer, dmx_red, dmx_green, dmx_blue, dmx_white);
 
 			/* Upscale values to 13 bit, also apply master dimmer channel */
@@ -137,7 +137,6 @@ void dmxlighttask(void *pvParameters) {
 			if (LEDC_INVERT_WHITE)
 				duty_white = duty_max - duty_white;
 
-			ESP_LOGI(TAG, "\033[0;31m R %lu \033[0;32m G %lu \033[0;34m B %lu \033[0;30m W %lu", duty_red, duty_green, duty_blue, duty_white);
 		}
 
 		/* Set duty cycle to RGBW values */
