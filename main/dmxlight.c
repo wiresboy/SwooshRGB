@@ -35,7 +35,7 @@
 #define LEDC_INVERT_BLUE         true
 
 /* White channel */
-#define LEDC_OUTPUT_IO_WHITE      (16) // Define the output GPIO 6
+#define LEDC_OUTPUT_IO_WHITE      (15) // Define the output GPIO integrated LED
 #define LEDC_CHANNEL_WHITE        LEDC_CHANNEL_3
 #define LEDC_INVERT_WHITE         true
 
@@ -44,6 +44,8 @@
 
 static const char *TAG = "DMX Light";
 dmxlight_config_t dmxlight_config;
+
+uint32_t duty_max = 8191;  // 13 bit timer (2**13) - 1
 
 void init_led_pwm() {
 	// Prepare and then apply the LEDC PWM timer configuration
@@ -91,10 +93,24 @@ void init_led_pwm() {
 
 void dmxlighttask(void *pvParameters) {
 	dmxlight_config = *(dmxlight_config_t *) pvParameters;
-	ESP_LOGI(TAG, "Start");
 
 	ESP_LOGI(TAG, "Init PWM");
 	init_led_pwm();
+
+	ESP_LOGI(TAG, "Start - flash light R,G,B");
+	updateOutput(duty_max, 0, 0, 0); // R
+	vTaskDelay(300 / portTICK_PERIOD_MS);
+
+	updateOutput(0, duty_max, 0, 0); // G
+	vTaskDelay(300 / portTICK_PERIOD_MS);
+
+	updateOutput(0, 0, duty_max, 0); // B
+	vTaskDelay(300 / portTICK_PERIOD_MS);
+	
+	updateOutput(0, 0, 0, duty_max); // (W)
+	vTaskDelay(300 / portTICK_PERIOD_MS);
+	
+	updateOutput(0, 0, 0, 0);
 
 	ESP_LOGI(TAG, "Start reading DMX values");
 	float dmx_dimmer = 0;
@@ -102,7 +118,7 @@ void dmxlighttask(void *pvParameters) {
 	float dmx_green = 0;
 	float dmx_blue = 0;
 	float dmx_white = 0;
-	uint32_t duty_max = 8191;  // 13 bit timer (2**13) - 1
+
 	uint32_t duty_red = 0;
 	uint32_t duty_green = 0;
 	uint32_t duty_blue = 0;
@@ -128,28 +144,32 @@ void dmxlighttask(void *pvParameters) {
 			duty_blue = (uint32_t)(((float)duty_max) * dmx_dimmer * dmx_blue);
 			duty_white = (uint32_t)(((float)duty_max) * dmx_dimmer * dmx_white);
 
-			if (LEDC_INVERT_RED)
-				duty_red = duty_max - duty_red;
-			if (LEDC_INVERT_GREEN)
-				duty_green = duty_max - duty_green;
-			if (LEDC_INVERT_BLUE)
-				duty_blue = duty_max - duty_blue;
-			if (LEDC_INVERT_WHITE)
-				duty_white = duty_max - duty_white;
-
 		}
 
 		/* Set duty cycle to RGBW values */
-		ESP_ERROR_CHECK(ledc_set_duty(LEDC_MODE, LEDC_CHANNEL_RED, duty_red));
-		ESP_ERROR_CHECK(ledc_set_duty(LEDC_MODE, LEDC_CHANNEL_GREEN, duty_green));
-		ESP_ERROR_CHECK(ledc_set_duty(LEDC_MODE, LEDC_CHANNEL_BLUE, duty_blue));
-		ESP_ERROR_CHECK(ledc_set_duty(LEDC_MODE, LEDC_CHANNEL_WHITE, duty_white));
-
-		ESP_ERROR_CHECK(ledc_update_duty(LEDC_MODE, LEDC_CHANNEL_RED));
-		ESP_ERROR_CHECK(ledc_update_duty(LEDC_MODE, LEDC_CHANNEL_GREEN));
-		ESP_ERROR_CHECK(ledc_update_duty(LEDC_MODE, LEDC_CHANNEL_BLUE));
-		ESP_ERROR_CHECK(ledc_update_duty(LEDC_MODE, LEDC_CHANNEL_WHITE));
+		updateOutput(duty_red, duty_green, duty_blue, duty_white);
 		vTaskDelay(20 / portTICK_PERIOD_MS);
 	}
 }
 
+void updateOutput( uint32_t duty_red, uint32_t duty_green, uint32_t duty_blue, uint32_t duty_white) {
+	if (LEDC_INVERT_RED)
+		duty_red = duty_max - duty_red;
+	if (LEDC_INVERT_GREEN)
+		duty_green = duty_max - duty_green;
+	if (LEDC_INVERT_BLUE)
+		duty_blue = duty_max - duty_blue;
+	if (LEDC_INVERT_WHITE)
+		duty_white = duty_max - duty_white;
+
+	/* Set duty cycle to RGBW values */
+	ESP_ERROR_CHECK(ledc_set_duty(LEDC_MODE, LEDC_CHANNEL_RED, duty_red));
+	ESP_ERROR_CHECK(ledc_set_duty(LEDC_MODE, LEDC_CHANNEL_GREEN, duty_green));
+	ESP_ERROR_CHECK(ledc_set_duty(LEDC_MODE, LEDC_CHANNEL_BLUE, duty_blue));
+	ESP_ERROR_CHECK(ledc_set_duty(LEDC_MODE, LEDC_CHANNEL_WHITE, duty_white));
+
+	ESP_ERROR_CHECK(ledc_update_duty(LEDC_MODE, LEDC_CHANNEL_RED));
+	ESP_ERROR_CHECK(ledc_update_duty(LEDC_MODE, LEDC_CHANNEL_GREEN));
+	ESP_ERROR_CHECK(ledc_update_duty(LEDC_MODE, LEDC_CHANNEL_BLUE));
+	ESP_ERROR_CHECK(ledc_update_duty(LEDC_MODE, LEDC_CHANNEL_WHITE));
+}

@@ -12,5 +12,6 @@ typedef struct {
 } dmxlight_config_t;
 
 void dmxlighttask(void *pvParameters);
+void updateOutput( uint32_t duty_red, uint32_t duty_green, uint32_t duty_blue, uint32_t duty_white);
 
 #endif /* DMXLIGHT_H_ */

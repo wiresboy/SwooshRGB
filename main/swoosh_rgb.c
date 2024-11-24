@@ -20,6 +20,7 @@ http://tim.gremalm.se
 
 #include "e131.h"
 #include "dmxlight.h"
+#include "hibernate.h"
 
 // XIAO ESP32C6 Antenna MUX IO
 #define ANT_MUX_PWR_PIN     3   // IO 3
@@ -156,5 +157,7 @@ void app_main(void) {
 	wifi_init_sta();
 
 	xTaskCreate(&e131task, "E131_task", 4096, NULL, 5, NULL);
+
+	xTaskCreate(&hibernatetask, "Hibernate_task", 4096, NULL, 5, NULL);
 }
 
